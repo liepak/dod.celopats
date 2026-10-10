@@ -81,13 +81,16 @@ async function collection() {
   if(folderButton){folderButton.hidden=!('webkitdirectory' in folderInput);folderButton.onclick=()=>folderInput.click();folderInput.onchange=e=>{addMedia([...e.target.files]);e.target.value='';};}
   const dropHint=document.createElement('div');dropHint.className='screen-drop-hint';dropHint.textContent='Drop photos & videos';dropHint.setAttribute('aria-hidden','true');document.body.append(dropHint);
   let dragDepth=0;
-  const isFileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
+  let internalDrag=false;
+  document.addEventListener('dragstart',()=>{internalDrag=true;});
+  const isFileDrag=e=>!internalDrag&&Array.from(e.dataTransfer?.types||[]).includes('Files');
   const clearDrag=()=>{dragDepth=0;document.body.classList.remove('file-dragging');};
   document.addEventListener('dragenter',e=>{if(!isFileDrag(e))return;e.preventDefault();dragDepth++;if(collectionInfo.uploadsOpen)document.body.classList.add('file-dragging');});
   document.addEventListener('dragover',e=>{if(!isFileDrag(e))return;e.preventDefault();e.dataTransfer.dropEffect=collectionInfo.uploadsOpen?'copy':'none';});
   document.addEventListener('dragleave',e=>{if(!isFileDrag(e))return;if(--dragDepth<=0)clearDrag();});
   document.addEventListener('drop',async e=>{if(!isFileDrag(e))return;e.preventDefault();clearDrag();if(!collectionInfo.uploadsOpen)return;try{const files=droppedFiles(e.dataTransfer);toast('Reading files…');addMedia(await files);}catch{toast('Could not read this folder. Try Choose folder.');}});
-  window.addEventListener('blur',clearDrag);document.addEventListener('dragend',clearDrag);
+  window.addEventListener('blur',clearDrag);document.addEventListener('dragend',()=>{internalDrag=false;clearDrag();});
+  document.addEventListener('drop',()=>{internalDrag=false;});
   await loadGallery();
 }
 async function loadGallery(page='') {
@@ -110,6 +113,7 @@ async function loadGallery(page='') {
 function preview(file,base) {
   const el=document.querySelector('#viewer-content');el.replaceChildren();
   const media=document.createElement(file.mimeType.startsWith('video/')?'video':'img');
+  media.draggable=false;media.addEventListener('dragstart',e=>e.preventDefault());
   if(media.tagName==='VIDEO'){media.controls=true;media.preload='metadata';}else{media.alt=file.name;}
   media.src=base+'/preview';media.onerror=()=>{media.remove();const p=document.createElement('p');p.textContent='Your browser can’t preview this format. Download the original to view it.';el.prepend(p);};
   el.append(media);const p=document.createElement('p');p.textContent=file.name;el.append(p);
