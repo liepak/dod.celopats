@@ -79,7 +79,7 @@ export class Drive {
   async session(url: string, size: number, offset?: number, body?: Buffer) {
     if (new URL(url).origin !== 'https://www.googleapis.com') throw new AppError(500,'Invalid upload session.');
     const headers = {'Authorization':`Bearer ${await this.token()}`,'Content-Range':body ? `bytes ${offset}-${offset + body.length - 1}/${size}` : `bytes */${size}`,'Content-Length':String(body?.length || 0)};
-    const r = await fetch(url,{method:'PUT',headers,body:body || Buffer.alloc(0),signal:AbortSignal.timeout(60000),redirect:'error'});
+    const r = await fetch(url,{method:'PUT',headers,body:body || Buffer.alloc(0),signal:AbortSignal.timeout(60000),redirect:'manual'});
     if (r.status === 308) {
       const range = r.headers.get('range'); return {offset:range ? Number(range.match(/\d+-(\d+)/)?.[1]) + 1 : 0, done:false};
     }
