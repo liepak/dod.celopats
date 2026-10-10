@@ -1,0 +1,35 @@
+name: dod
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_ORIGIN: https://dod.celopats.lv
+      DATA_DIR: /data
+      PORT: 3000
+    volumes:
+      - ./data:/data
+    networks:
+      frontend:
+        aliases: [dod-app]
+    mem_limit: 384m
+    cpus: 0.75
+    pids_limit: 100
+    read_only: true
+    tmpfs: [/tmp:size=16m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+networks:
+  frontend:
+    external: true
+    name: kcdrumlessons_frontend
