@@ -128,7 +128,7 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
         if(method!=='GET') {sameOrigin(req);if(req.headers['x-csrf-token']!==s.csrf)throw new AppError(403,'Please refresh the dashboard and try again.');}
         if(path==='/api/admin/status'&&method==='GET') {
           const conf=store.get('google'),auth=store.get('oauth');
-          return json(res,{csrf:s.csrf,configured:!!conf,connected:!!auth?.refresh_token,ownerEmail:conf?.ownerEmail||'',driveEmail:auth?.email||'',pickerKey:conf?.pickerKey||'',clientId:conf?.clientId||''});
+          return json(res,{csrf:s.csrf,configured:!!conf,connected:!!auth?.refresh_token,ownerEmail:conf?.ownerEmail||store.get('ownerEmail')||'',driveEmail:auth?.email||'',pickerKey:conf?.pickerKey||'',clientId:conf?.clientId||''});
         }
         if(path==='/api/admin/logout'&&method==='POST') {db.prepare('DELETE FROM sessions WHERE id=?').run(s.id);res.setHeader('Set-Cookie','dod_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');return json(res,{ok:true});}
         if(path==='/api/admin/password'&&method==='POST') {
@@ -139,6 +139,8 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
         if(path==='/api/admin/google'&&method==='POST') {
           const b=await jsonBody(req),old=store.get('google');
           if(!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(b.clientId||'')||!b.clientSecret||!/^\S+@\S+\.\S+$/.test(b.ownerEmail||''))throw new AppError(400,'Enter the Google client ID, client secret, and owner email.');
+          const assignedOwner=store.get('ownerEmail');
+          if(assignedOwner && assignedOwner.toLowerCase()!==b.ownerEmail.toLowerCase())throw new AppError(400,'Use the Google owner account assigned to this service.');
           if(store.get('oauth') && (old.clientId!==b.clientId||old.ownerEmail!==b.ownerEmail))throw new AppError(400,'Disconnect Google before changing the owner or client ID.');
           store.set('google',{clientId:clean(b.clientId,200),clientSecret:clean(b.clientSecret,300),ownerEmail:clean(b.ownerEmail,200),pickerKey:clean(b.pickerKey,200)});
           return json(res,{ok:true});
