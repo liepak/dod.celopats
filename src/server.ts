@@ -245,7 +245,7 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
         throw new AppError(404,'This action is unavailable.');
       }
       if(method==='GET') {
-        const assets={'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml']};
+        const assets={'/folder-files.js':['folder-files.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml']};
         const asset=assets[path];
         if(asset){res.setHeader('Content-Type',asset[1]);return res.end(readFileSync(join(root,'../public',asset[0])));}
         if(path==='/'||path==='/admin'||path==='/memories'||/^\/c\/[\w-]+$/.test(path)){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(readFileSync(join(root,'../public/index.html')));}
