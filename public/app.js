@@ -68,12 +68,17 @@ const collectionApi=(path,options)=>api(`/api/c/${token}${path}`,options);
 const queue=[];let running=false,hasMore='';
 async function collection() {
   try{collectionInfo=await collectionApi('');}catch(e){app.innerHTML=`<div class="panel narrow"><p class="eyebrow">Shared collection</p><h1>Link unavailable.</h1><p class="muted">${escape(e.message)}</p><p class="help">Ask the collection owner for a new link.</p></div>`;return;}
+  const {droppedFiles,mediaFiles}=await import('/folder-files.js');
+  const addMedia=files=>{const media=mediaFiles(files);if(media.length)addFiles(media);if(media.length<files.length)toast('Only photos and videos are uploaded.');if(!files.length)toast('No photos or videos found.');};
   document.title=collectionInfo.name+' — DOD';
   document.body.classList.add('shared-page');
-  app.innerHTML=`<section class="collection-heading"><h1>${escape(collectionInfo.name)}</h1></section><section class="upload-box" id="dropzone">${collectionInfo.uploadsOpen?'<button class="btn" id="choose-files">＋ Choose photos & videos</button><input class="file-input" type="file" id="files" multiple accept="image/*,video/*,.heic,.heif,.mov,.mkv,.m4v" aria-label="Choose photos and videos">':'<h2>Uploads closed</h2>'}</section><section id="queue" class="queue off" aria-live="polite"><h3>Your uploads</h3><p class="help">Keep this page open until all uploads finish.</p><div id="queue-items"></div></section><div class="gallery-bar"><h2>Photos & videos</h2><button class="text-button" id="refresh">Refresh ↻</button></div><div id="gallery" class="gallery"></div><div id="gallery-message"></div><button class="btn secondary section-gap off" id="more">Show more</button>`;
+  app.innerHTML=`<section class="collection-heading"><h1>${escape(collectionInfo.name)}</h1></section><section class="upload-box" id="dropzone">${collectionInfo.uploadsOpen?'<button class="btn" id="choose-files">＋ Choose photos & videos</button><input class="file-input" type="file" id="files" multiple accept="image/*,video/*,.heic,.heif,.mov,.mkv,.m4v" aria-label="Choose photos and videos"><button class="btn secondary" id="choose-folder">Choose folder</button><input class="file-input" type="file" id="folder" multiple webkitdirectory aria-label="Choose folder to upload">':'<h2>Uploads closed</h2>'}</section><section id="queue" class="queue off" aria-live="polite"><h3>Your uploads</h3><p class="help">Keep this page open until all uploads finish.</p><div id="queue-items"></div></section><div class="gallery-bar"><h2>Photos & videos</h2><button class="text-button" id="refresh">Refresh ↻</button></div><div id="gallery" class="gallery"></div><div id="gallery-message"></div><button class="btn secondary section-gap off" id="more">Show more</button>`;
   document.querySelector('#refresh').onclick=()=>loadGallery();document.querySelector('#more').onclick=()=>loadGallery(hasMore);
   document.querySelector('#choose-files')?.addEventListener('click',()=>document.querySelector('#files').click());
-  document.querySelector('#files')?.addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value='';});
+  document.querySelector('#files')?.addEventListener('change',e=>{addMedia([...e.target.files]);e.target.value='';});
+  const folderInput=document.querySelector('#folder');
+  const folderButton=document.querySelector('#choose-folder');
+  if(folderButton){folderButton.hidden=!('webkitdirectory' in folderInput);folderButton.onclick=()=>folderInput.click();folderInput.onchange=e=>{addMedia([...e.target.files]);e.target.value='';};}
   const dropHint=document.createElement('div');dropHint.className='screen-drop-hint';dropHint.textContent='Drop photos & videos';dropHint.setAttribute('aria-hidden','true');document.body.append(dropHint);
   let dragDepth=0;
   const isFileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
@@ -81,7 +86,7 @@ async function collection() {
   document.addEventListener('dragenter',e=>{if(!isFileDrag(e))return;e.preventDefault();dragDepth++;if(collectionInfo.uploadsOpen)document.body.classList.add('file-dragging');});
   document.addEventListener('dragover',e=>{if(!isFileDrag(e))return;e.preventDefault();e.dataTransfer.dropEffect=collectionInfo.uploadsOpen?'copy':'none';});
   document.addEventListener('dragleave',e=>{if(!isFileDrag(e))return;if(--dragDepth<=0)clearDrag();});
-  document.addEventListener('drop',e=>{if(!isFileDrag(e))return;e.preventDefault();clearDrag();if(collectionInfo.uploadsOpen)addFiles([...e.dataTransfer.files]);});
+  document.addEventListener('drop',async e=>{if(!isFileDrag(e))return;e.preventDefault();clearDrag();if(!collectionInfo.uploadsOpen)return;try{const files=droppedFiles(e.dataTransfer);toast('Reading files…');addMedia(await files);}catch{toast('Could not read this folder. Try Choose folder.');}});
   window.addEventListener('blur',clearDrag);document.addEventListener('dragend',clearDrag);
   await loadGallery();
 }
@@ -112,7 +117,7 @@ function preview(file,base) {
 }
 document.querySelector('#close-viewer').onclick=()=>document.querySelector('#viewer').close();
 document.querySelector('#viewer').addEventListener('close',()=>document.querySelector('#viewer-content').replaceChildren());
-function fingerprint(file){return [file.name,file.size,file.lastModified].join(':');}
+function fingerprint(file){return [file.dodPath||file.webkitRelativePath||file.name,file.size,file.lastModified].join(':');}
 function addFiles(files) {
   for(const file of files){if(queue.some(x=>fingerprint(x.file)===fingerprint(file)&&x.state!=='failed'))continue;queue.push({file,state:'waiting',offset:0,id:null,error:''});}
   renderQueue();runQueue();
