@@ -90,6 +90,7 @@ test('Google upload protocol treats 308 as partial, 200 as complete, and 404 as 
     let calls=[];
     globalThis.fetch=async(url,opts)=>{calls.push({url,opts});return new Response(null,{status:308,headers:{range:'bytes=0-262143'}});};
     const partial=await drive.session('https://www.googleapis.com/upload/session',300000,0,Buffer.alloc(262144));
+    assert.equal(calls[0].opts.redirect,'manual');
     assert.equal(partial.offset,262144);assert.equal(partial.done,false);assert.equal(calls[0].opts.headers['Content-Range'],'bytes 0-262143/300000');
     globalThis.fetch=async()=>new Response(JSON.stringify({id:'f'}),{status:200});
     assert.equal((await drive.session('https://www.googleapis.com/upload/session',300000)).done,true);
