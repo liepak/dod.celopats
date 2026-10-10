@@ -69,7 +69,8 @@ const queue=[];let running=false,hasMore='';
 async function collection() {
   try{collectionInfo=await collectionApi('');}catch(e){app.innerHTML=`<div class="panel narrow"><p class="eyebrow">Shared collection</p><h1>Link unavailable.</h1><p class="muted">${escape(e.message)}</p><p class="help">Ask the collection owner for a new link.</p></div>`;return;}
   document.title=collectionInfo.name+' — DOD';
-  app.innerHTML=`<section class="collection-heading"><p class="eyebrow">A shared collection</p><h1>${escape(collectionInfo.name)}</h1><p>${escape(collectionInfo.description||'All our favourite moments, in one place. Add yours and take home the ones you love.')}</p></section><section class="upload-box" id="dropzone"><div><h2>${collectionInfo.uploadsOpen?'Add your side of the story.':'The collection is all here.'}</h2><p>${collectionInfo.uploadsOpen?'Choose your photos and videos. Originals stay original.':'Uploads are closed, but you can still enjoy and download the memories.'}</p></div>${collectionInfo.uploadsOpen?'<button class="btn light" id="choose-files">＋ Choose photos & videos</button><input class="file-input" type="file" id="files" multiple accept="image/*,video/*,.heic,.heif,.mov,.mkv,.m4v" aria-label="Choose photos and videos">':''}</section><p class="upload-note">Anyone with this link can view, download${collectionInfo.uploadsOpen?', and add files':''}. Existing files can’t be deleted or replaced here.</p><section id="queue" class="queue off" aria-live="polite"><h3>Your uploads</h3><p class="help">Keep this page open and your phone awake until every file says “Saved in Drive”.</p><div id="queue-items"></div></section><div class="gallery-bar"><h2>Everyone’s memories</h2><button class="text-button" id="refresh">Refresh collection ↻</button></div><div id="gallery" class="gallery"></div><div id="gallery-message"></div><button class="btn secondary section-gap off" id="more">Load more memories</button>`;
+  document.body.classList.add('shared-page');
+  app.innerHTML=`<section class="collection-heading"><h1>${escape(collectionInfo.name)}</h1></section><section class="upload-box" id="dropzone">${collectionInfo.uploadsOpen?'<button class="btn" id="choose-files">＋ Choose photos & videos</button><input class="file-input" type="file" id="files" multiple accept="image/*,video/*,.heic,.heif,.mov,.mkv,.m4v" aria-label="Choose photos and videos">':'<h2>Uploads closed</h2>'}</section><section id="queue" class="queue off" aria-live="polite"><h3>Your uploads</h3><p class="help">Keep this page open until all uploads finish.</p><div id="queue-items"></div></section><div class="gallery-bar"><h2>Photos & videos</h2><button class="text-button" id="refresh">Refresh ↻</button></div><div id="gallery" class="gallery"></div><div id="gallery-message"></div><button class="btn secondary section-gap off" id="more">Show more</button>`;
   document.querySelector('#refresh').onclick=()=>loadGallery();document.querySelector('#more').onclick=()=>loadGallery(hasMore);
   document.querySelector('#choose-files')?.addEventListener('click',()=>document.querySelector('#files').click());
   document.querySelector('#files')?.addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value='';});
@@ -79,18 +80,18 @@ async function collection() {
 }
 async function loadGallery(page='') {
   const g=document.querySelector('#gallery'),msg=document.querySelector('#gallery-message'),more=document.querySelector('#more');
-  msg.innerHTML='<div class="loading">Gathering the memories…</div>';more.disabled=true;
+  msg.innerHTML='<div class="loading">Loading…</div>';more.disabled=true;
   try{
     const r=await collectionApi('/files'+(page?'?page='+encodeURIComponent(page):''));
     if(!page)g.replaceChildren();msg.replaceChildren();
     for(const f of r.files){
       const base=`/api/c/${token}/files/${encodeURIComponent(f.id)}`;
       const card=document.createElement('article');card.className='file-card';
-      card.innerHTML=`<button class="thumb" aria-label="Preview ${escape(f.name)}">${f.hasThumbnail?`<img src="${base}/thumbnail" alt="" loading="lazy">`:`<span aria-hidden="true">${f.mimeType.startsWith('video/')?'▷':'▧'}</span>`}</button><div class="file-info"><p class="file-name" title="${escape(f.name)}">${escape(f.name)}</p><div class="file-meta">${f.mimeType.startsWith('video/')?'Video':'Photo'} · ${size(f.size||0)}</div><a class="download-link" href="${base}/download">Download original ↓</a></div>`;
+      card.innerHTML=`<button class="thumb" aria-label="Preview ${escape(f.name)}">${f.hasThumbnail?`<img src="${base}/thumbnail" alt="" loading="lazy">`:`<span aria-hidden="true">${f.mimeType.startsWith('video/')?'▷':'▧'}</span>`}</button><div class="file-info"><p class="file-name" title="${escape(f.name)}">${escape(f.name)}</p><div class="file-meta">${f.mimeType.startsWith('video/')?'Video':'Photo'} · ${size(f.size||0)}</div><a class="download-link" href="${base}/download">Download ↓</a></div>`;
       card.querySelector('img')?.addEventListener('error',e=>{e.target.replaceWith(document.createTextNode(f.mimeType.startsWith('video/')?'▷':'▧'));});
       card.querySelector('.thumb').onclick=()=>preview(f,base);g.append(card);
     }
-    if(!g.children.length)msg.innerHTML='<div class="empty"><div class="round-icon">▧</div><h3>Every trip starts with a first photo.</h3><p>Add some memories to get this collection going. They’ll appear here once saved in Drive.</p></div>';
+    if(!g.children.length)msg.innerHTML='<div class="empty"><h3>No photos or videos yet</h3></div>';
     hasMore=r.nextPageToken||'';more.classList.toggle('off',!hasMore);
   }catch(e){msg.innerHTML=`<div class="empty"><h3>Couldn’t load the collection.</h3><p>${escape(e.message)}</p></div>`;}finally{more.disabled=false;}
 }
@@ -100,7 +101,7 @@ function preview(file,base) {
   if(media.tagName==='VIDEO'){media.controls=true;media.preload='metadata';}else{media.alt=file.name;}
   media.src=base+'/preview';media.onerror=()=>{media.remove();const p=document.createElement('p');p.textContent='Your browser can’t preview this format. Download the original to view it.';el.prepend(p);};
   el.append(media);const p=document.createElement('p');p.textContent=file.name;el.append(p);
-  const a=document.createElement('a');a.className='download-link';a.href=base+'/download';a.textContent='Download original ↓';el.append(a);document.querySelector('#viewer').showModal();
+  const a=document.createElement('a');a.className='download-link';a.href=base+'/download';a.textContent='Download ↓';el.append(a);document.querySelector('#viewer').showModal();
 }
 document.querySelector('#close-viewer').onclick=()=>document.querySelector('#viewer').close();
 document.querySelector('#viewer').addEventListener('close',()=>document.querySelector('#viewer-content').replaceChildren());
@@ -111,7 +112,7 @@ function addFiles(files) {
 }
 function renderQueue(){
   document.querySelector('#queue').classList.remove('off');
-  document.querySelector('#queue-items').innerHTML=queue.map((u,i)=>`<div class="upload-item"><div class="row"><span class="name" title="${escape(u.file.name)}">${escape(u.file.name)}</span><span class="state">${u.state==='done'?'✓ Saved in Drive':u.state==='failed'?'Needs attention':u.state==='waiting'?'Waiting':u.state==='retrying'?'Connection interrupted — retrying':`${Math.floor(u.offset/u.file.size*100)}% · ${size(u.offset)} / ${size(u.file.size)}`}</span></div><progress value="${u.offset}" max="${u.file.size}" aria-label="Upload progress for ${escape(u.file.name)}"></progress>${u.error?`<p class="error">${escape(u.error)}</p>`:''}${u.state==='failed'?`<button class="text-button retry" data-i="${i}">Retry this file</button>`:''}</div>`).join('');
+  document.querySelector('#queue-items').innerHTML=queue.map((u,i)=>`<div class="upload-item ${u.state}"><div class="row"><span class="name" title="${escape(u.file.name)}">${escape(u.file.name)}</span><span class="state">${u.state==='done'?'✓ Uploaded':u.state==='failed'?'Upload failed':u.state==='waiting'?'Waiting':u.state==='retrying'?'Connection interrupted — retrying':`${Math.floor(u.offset/u.file.size*100)}%`}</span></div><progress value="${u.offset}" max="${u.file.size}" aria-label="Upload progress for ${escape(u.file.name)}"></progress>${u.error?`<p class="error">${escape(u.error)}</p>`:''}${u.state==='failed'?`<button class="text-button retry" data-i="${i}">Retry this file</button>`:''}</div>`).join('');
   document.querySelectorAll('.retry').forEach(b=>b.onclick=()=>{const u=queue[Number(b.dataset.i)];u.state='waiting';u.error='';renderQueue();runQueue();});
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -147,7 +148,7 @@ async function runQueue(){
   if(running)return;running=true;busy=true;
   let wakeLock;
   try{wakeLock=await navigator.wakeLock?.request('screen');}catch{}
-  try{while(queue.some(u=>u.state==='waiting')){const batch=queue.filter(u=>u.state==='waiting').slice(0,2);await Promise.all(batch.map(upload));}await loadGallery();if(queue.length&&queue.every(u=>u.state==='done'))toast('All your files are saved in Google Drive. Thank you!');}
+  try{while(queue.some(u=>u.state==='waiting')){const batch=queue.filter(u=>u.state==='waiting').slice(0,2);await Promise.all(batch.map(upload));}await loadGallery();if(queue.length&&queue.every(u=>u.state==='done'))toast('All uploads finished.');}
   finally{running=false;busy=false;await wakeLock?.release().catch(()=>{});}
 }
 window.addEventListener('beforeunload',e=>{if(busy){e.preventDefault();e.returnValue='';}});
