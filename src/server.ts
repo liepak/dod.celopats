@@ -45,6 +45,7 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
     if(req.headers.origin!==origin) throw new AppError(403,'Please use the collection page to perform this action.');
   }
   function collection(token: string) {
+    if(token==='memories')token=store.get('memoriesToken')||'';
     if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new AppError(404,'This collection link is unavailable.');
     const c=db.prepare('SELECT * FROM collections WHERE token=? AND active=1').get(token);
     if(!c)throw new AppError(404,'This collection link has been closed or replaced.');return c;
@@ -247,7 +248,7 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
         const assets={'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml']};
         const asset=assets[path];
         if(asset){res.setHeader('Content-Type',asset[1]);return res.end(readFileSync(join(root,'../public',asset[0])));}
-        if(path==='/'||path==='/admin'||/^\/c\/[\w-]+$/.test(path)){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(readFileSync(join(root,'../public/index.html')));}
+        if(path==='/'||path==='/admin'||path==='/memories'||/^\/c\/[\w-]+$/.test(path)){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(readFileSync(join(root,'../public/index.html')));}
       }
       throw new AppError(404,'Page not found.');
     } catch(e) {
