@@ -63,7 +63,7 @@ async function loadCollections() {
   }catch(e){target.innerHTML=`<p class="error" role="alert">${escape(e.message)}</p>`;}
 }
 
-const token=location.pathname.match(/^\/c\/([\w-]+)$/)?.[1];
+const token=location.pathname==='/memories'?'memories':location.pathname.match(/^\/c\/([\w-]+)$/)?.[1];
 const collectionApi=(path,options)=>api(`/api/c/${token}${path}`,options);
 const queue=[];let running=false,hasMore='';
 async function collection() {
