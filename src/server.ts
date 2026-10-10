@@ -91,7 +91,7 @@ export function createApp({dir = process.env.DATA_DIR || './data', origin = proc
     res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://*.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.googleapis.com https://*.google.com; frame-src https://*.google.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     try {
-      const url=new URL(req.url,origin), path=url.pathname, method=req.method;
+      const url=new URL(req.url,origin), path=url.pathname, method=req.method==='HEAD'?'GET':req.method;
       const ip=req.socket.remoteAddress || 'unknown';
       if(path==='/health' && method==='GET')return json(res,{ok:true});
       if(path==='/api/login' && method==='POST') {
