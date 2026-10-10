@@ -65,7 +65,7 @@ async function loadCollections() {
 
 const token=location.pathname==='/memories'?'memories':location.pathname.match(/^\/c\/([\w-]+)$/)?.[1];
 const collectionApi=(path,options)=>api(`/api/c/${token}${path}`,options);
-const queue=[];let running=false,hasMore='';
+const queue=[];let running=false,hasMore='',completionOrder=0;
 async function collection() {
   try{collectionInfo=await collectionApi('');}catch(e){app.innerHTML=`<div class="panel narrow"><p class="eyebrow">Shared collection</p><h1>Link unavailable.</h1><p class="muted">${escape(e.message)}</p><p class="help">Ask the collection owner for a new link.</p></div>`;return;}
   const {droppedFiles,mediaFiles}=await import('/folder-files.js');
@@ -128,7 +128,10 @@ function addFiles(files) {
 }
 function renderQueue(){
   document.querySelector('#queue').classList.remove('off');
-  document.querySelector('#queue-items').innerHTML=queue.map((u,i)=>`<div class="upload-item ${u.state}"><div class="row"><span class="name" title="${escape(u.file.name)}">${escape(u.file.name)}</span><span class="state">${u.state==='done'?'✓ Uploaded':u.state==='failed'?'Upload failed':u.state==='waiting'?'Waiting':u.state==='retrying'?'Connection interrupted — retrying':`${Math.floor(u.offset/u.file.size*100)}%`}</span></div><progress value="${u.offset}" max="${u.file.size}" aria-label="Upload progress for ${escape(u.file.name)}"></progress>${u.error?`<p class="error">${escape(u.error)}</p>`:''}${u.state==='failed'?`<button class="text-button retry" data-i="${i}">Retry this file</button>`:''}</div>`).join('');
+  const indexed=queue.map((u,i)=>({u,i}));
+  const recent=indexed.filter(({u})=>u.state==='done').sort((a,b)=>(b.u.completed||0)-(a.u.completed||0)).slice(0,3);
+  const visible=[...indexed.filter(({u})=>u.state!=='done'),...recent];
+  document.querySelector('#queue-items').innerHTML=visible.map(({u,i})=>`<div class="upload-item ${u.state}"><div class="row"><span class="name" title="${escape(u.file.name)}">${escape(u.file.name)}</span><span class="state">${u.state==='done'?'✓ Uploaded':u.state==='failed'?'Upload failed':u.state==='waiting'?'Waiting':u.state==='retrying'?'Connection interrupted — retrying':`${Math.floor(u.offset/u.file.size*100)}%`}</span></div>${u.state==='done'?'':`<progress value="${u.offset}" max="${u.file.size}" aria-label="Upload progress for ${escape(u.file.name)}"></progress>`}${u.error?`<p class="error">${escape(u.error)}</p>`:''}${u.state==='failed'?`<button class="text-button retry" data-i="${i}">Retry this file</button>`:''}</div>`).join('');
   document.querySelectorAll('.retry').forEach(b=>b.onclick=()=>{const u=queue[Number(b.dataset.i)];u.state='waiting';u.error='';renderQueue();runQueue();});
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -138,7 +141,7 @@ async function upload(u) {
     u.state='uploading';renderQueue();
     let previous;try{previous=JSON.parse(localStorage.getItem(key)||'null');}catch{}
     if(!u.id && previous?.id)u.id=previous.id;
-    if(u.id){try{const s=await collectionApi('/uploads/'+u.id);u.offset=s.offset;if(s.done){u.state='done';localStorage.removeItem(key);return;}}catch(e){if(e.status===404||e.status===410){u.id=null;u.offset=0;}else throw e;}}
+    if(u.id){try{const s=await collectionApi('/uploads/'+u.id);u.offset=s.offset;if(s.done){u.state='done';u.completed=++completionOrder;localStorage.removeItem(key);return;}}catch(e){if(e.status===404||e.status===410){u.id=null;u.offset=0;}else throw e;}}
     if(!u.id){const s=await collectionApi('/uploads',{method:'POST',body:{name:u.file.name,size:u.file.size,mime:u.file.type}});u.id=s.id;u.offset=s.offset;try{localStorage.setItem(key,JSON.stringify({id:u.id}));}catch{}}
     let attempts=0;
     while(u.offset<u.file.size) {
@@ -157,7 +160,7 @@ async function upload(u) {
     }
     const final=await collectionApi('/uploads/'+u.id);
     if(!final.done)throw new Error('Still waiting for Google Drive to confirm this file. Please retry.');
-    u.offset=u.file.size;u.state='done';try{localStorage.removeItem(key);}catch{}
+    u.offset=u.file.size;u.state='done';u.completed=++completionOrder;try{localStorage.removeItem(key);}catch{}
   }catch(e){u.state='failed';u.error=e.message;if(e.status===410){u.id=null;u.offset=0;try{localStorage.removeItem(key);}catch{}}}finally{renderQueue();}
 }
 async function runQueue(){
